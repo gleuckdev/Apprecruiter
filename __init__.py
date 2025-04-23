@@ -1,20 +1,24 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
-from flask_cors import CORS
-from .config import Config
+import os
 
 db = SQLAlchemy()
 
 def create_app():
     app = Flask(__name__)
-    app.config.from_object(Config)
 
-    # Initialize extensions
+    # Load config
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI')
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+    # Debugging step
+    print("Loaded DB URI:", app.config['SQLALCHEMY_DATABASE_URI'])
+
+    # Initialize DB
     db.init_app(app)
-    CORS(app)
 
-    # Register routes
-    from . import routes
+    # Register blueprints or routes
+    # from .views import views
+    # app.register_blueprint(views)
 
     return app
-print("DATABASE URI:", app.config.get("SQLALCHEMY_DATABASE_URI"))
