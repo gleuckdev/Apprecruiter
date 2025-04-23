@@ -9,3 +9,4 @@ class Config:
     SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI')
     SQLALCHEMY_TRACK_MODIFICATIONS = False  # Disables modification tracking to save resources
     SQLALCHEMY_ECHO = False  # Set to True for verbose SQL logging during development
+    SECRET_KEY = os.getenv("SECRET_KEY", "supersecretkey")
