@@ -13,8 +13,7 @@ def create_app():
     db.init_app(app)
     CORS(app)
 
-    # Register routes or blueprints
-    from .views import views  # assuming views.py defines a Blueprint named 'views'
-    app.register_blueprint(views)
+    # Register routes
+    from . import routes
 
     return app
