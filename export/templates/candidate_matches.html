@@ -1,0 +1,247 @@
+<!-- templates/candidate_matches.html -->
+<div class="candidates-match-header">
+    <h3 class="matches-title">Matching Candidates for "{{ job.title }}"</h3>
+    <div class="matches-meta">
+        <span class="matches-count">{{ matches|length }} candidates found</span>
+    </div>
+</div>
+
+{% if matches and matches|length > 0 %}
+<div class="candidates-list-container">
+    <div class="candidates-list">
+        <div class="candidates-list-header">
+            <div class="candidate-col candidate-name-col">Candidate</div>
+            <div class="candidate-col candidate-skills-col">Key Skills</div>
+            <div class="candidate-col candidate-score-col">Match Score</div>
+            <div class="candidate-col candidate-actions-col">Actions</div>
+        </div>
+        
+        {% for candidate in matches %}
+        <div class="candidate-list-item">
+            <div class="candidate-col candidate-name-col">
+                <div class="candidate-avatar">
+                    {{ candidate.name[:1].upper() if candidate.name else "?" }}
+                </div>
+                <div class="candidate-info">
+                    <div class="candidate-name">{{ candidate.name }}</div>
+                    <div class="candidate-contact">
+                        <span class="candidate-email">{{ candidate.email }}</span>
+                        {% if candidate.phone %}
+                        <span class="candidate-phone">{{ candidate.phone }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="candidate-col candidate-skills-col">
+                <div class="skills-tags">
+                    {% if candidate.skills %}
+                        {% for skill in candidate.skills[:3] %}
+                        <span class="skill-tag">{{ skill }}</span>
+                        {% endfor %}
+                        {% if candidate.skills|length > 3 %}
+                        <span class="more-skills">+{{ candidate.skills|length - 3 }}</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="no-skills">No skills listed</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="candidate-col candidate-score-col">
+                <div class="match-score-badge 
+                    {{ 'high' if candidate.score >= 0.7 else 'medium' if candidate.score >= 0.4 else 'low' }}">
+                    {{ (candidate.score * 100)|round|int }}%
+                </div>
+                <div class="score-label">AI Match</div>
+            </div>
+            
+            <div class="candidate-col candidate-actions-col">
+                <div class="candidate-actions">
+                    <button class="btn btn-outline btn-sm view-profile-btn" 
+                            onclick="showCandidateProfile({{ loop.index0 }})">
+                        <i class="material-icons">visibility</i>
+                        Quick View
+                    </button>
+                    <a href="/candidates/{{ candidate.id }}" class="btn btn-outline btn-sm">
+                        <i class="material-icons">person</i>
+                        Full Profile
+                    </a>
+                    {% if candidate.resume_url %}
+                    <a href="{{ candidate.resume_url }}" target="_blank" class="btn btn-primary btn-sm">
+                        <i class="material-icons">description</i>
+                        Resume
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Candidate Profile Modal -->
+<div id="candidateProfileModal" class="modal" style="display:none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Candidate Profile</h3>
+            <button type="button" class="modal-close" onclick="hideProfileModal()">
+                <i class="material-icons">close</i>
+            </button>
+        </div>
+        
+        <div class="modal-body">
+            <div id="profileContainer" class="profile-container">
+                <!-- Profile content will be injected here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Store candidate data for modal display
+const candidateData = [
+    {% for candidate in matches %}
+    {
+        name: "{{ candidate.name }}",
+        email: "{{ candidate.email }}",
+        phone: "{{ candidate.phone }}",
+        score: {{ candidate.score }},
+        scorePercent: {{ (candidate.score * 100)|round|int }},
+        skills: {{ candidate.skills|tojson }},
+        experience: {{ candidate.experience|tojson }},
+        resumeUrl: "{{ candidate.resume_url }}"
+    }{{ "," if not loop.last }}
+    {% endfor %}
+];
+
+function showCandidateProfile(index) {
+    const candidate = candidateData[index];
+    const profileContainer = document.getElementById('profileContainer');
+    
+    // Create profile HTML
+    let profileHtml = `
+        <div class="profile-header">
+            <div class="profile-avatar large">
+                ${candidate.name.charAt(0).toUpperCase()}
+            </div>
+            <div class="profile-title">
+                <h2 class="profile-name">${candidate.name}</h2>
+                <div class="profile-meta">
+                    <div class="profile-meta-item">
+                        <i class="material-icons">email</i>
+                        <span>${candidate.email}</span>
+                    </div>
+                    ${candidate.phone ? `
+                    <div class="profile-meta-item">
+                        <i class="material-icons">phone</i>
+                        <span>${candidate.phone}</span>
+                    </div>
+                    ` : ''}
+                </div>
+            </div>
+            <div class="profile-score-wrapper">
+                <div class="profile-score ${candidate.score >= 0.7 ? 'high' : candidate.score >= 0.4 ? 'medium' : 'low'}">
+                    ${candidate.scorePercent}%
+                </div>
+                <div class="profile-score-label">AI Match Score</div>
+            </div>
+        </div>
+        
+        <div class="profile-section">
+            <h3 class="section-title">Skills</h3>
+            <div class="profile-skills">
+                ${candidate.skills && candidate.skills.length > 0 ? 
+                  candidate.skills.map(skill => `<span class="skill-tag">${skill}</span>`).join('') 
+                  : '<p class="no-data">No skills information available</p>'}
+            </div>
+        </div>
+        
+        <div class="profile-section">
+            <h3 class="section-title">Experience</h3>
+            ${renderExperience(candidate.experience)}
+        </div>
+        
+        <div class="profile-actions">
+            <a href="/candidates/${candidate.id}" class="btn btn-primary">
+                <i class="material-icons">person</i>
+                View Full Profile
+            </a>
+            ${candidate.resumeUrl ? `
+            <a href="${candidate.resumeUrl}" target="_blank" class="btn btn-outline">
+                <i class="material-icons">description</i>
+                View Resume
+            </a>
+            ` : ''}
+        </div>
+    `;
+    
+    profileContainer.innerHTML = profileHtml;
+    
+    // Show modal
+    const modal = document.getElementById('candidateProfileModal');
+    modal.style.display = 'flex';
+    setTimeout(() => {
+        modal.querySelector('.modal-content').style.opacity = '1';
+        modal.querySelector('.modal-content').style.transform = 'translateY(0)';
+    }, 10);
+    document.body.style.overflow = 'hidden';
+}
+
+function renderExperience(experience) {
+    if (!experience || experience.length === 0) {
+        return '<p class="no-data">No experience information available</p>';
+    }
+    
+    let html = '<div class="timeline">';
+    
+    for (const exp of experience) {
+        html += `
+            <div class="timeline-item">
+                <div class="timeline-marker">
+                    <i class="material-icons">business</i>
+                </div>
+                <div class="timeline-content">
+                    <h4 class="timeline-title">
+                        ${exp.title || 'Position'}
+                        ${exp.company ? `<span class="company-name">at ${exp.company}</span>` : ''}
+                    </h4>
+                    ${exp.years ? `<div class="timeline-period">${exp.years}</div>` : ''}
+                    ${exp.description ? `<p class="timeline-description">${exp.description}</p>` : ''}
+                </div>
+            </div>
+        `;
+    }
+    
+    html += '</div>';
+    return html;
+}
+
+function hideProfileModal() {
+    const modal = document.getElementById('candidateProfileModal');
+    if (!modal) return;
+    
+    const content = modal.querySelector('.modal-content');
+    content.style.opacity = '0';
+    content.style.transform = 'translateY(20px)';
+    
+    setTimeout(() => {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }, 300);
+}
+</script>
+
+{% else %}
+<div class="empty-state">
+    <i class="material-icons" style="font-size: 48px; color: var(--primary-color); margin-bottom: 1rem;">person_search</i>
+    <h3 class="empty-state-title">No Matching Candidates</h3>
+    <p class="empty-state-description">We couldn't find any candidates matching this job's requirements.</p>
+    <div class="empty-state-actions">
+        <a href="/candidates" class="btn btn-primary">
+            <i class="material-icons">people</i>
+            Browse All Candidates
+        </a>
+    </div>
+</div>
+{% endif %}

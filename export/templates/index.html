@@ -1,0 +1,64 @@
+<!-- templates/index.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="hero">
+    <h1>AI-Powered Recruitment Platform</h1>
+    <p>Find the best candidates faster with intelligent matching</p>
+    <div class="cta-buttons">
+        <a href="/recruiter/login" class="btn btn-primary">Recruiter Login</a>
+        <a href="/apply" class="btn btn-secondary">Candidate Application</a>
+    </div>
+</div>
+
+<section class="features">
+    <div class="feature-card">
+        <h3>Smart Matching</h3>
+        <p>AI-powered candidate-job matching with semantic analysis</p>
+        <div style="text-align: center; margin-top: 20px;">
+            <i data-feather="search" style="width: 48px; height: 48px; color: var(--primary-color);"></i>
+        </div>
+    </div>
+    <div class="feature-card">
+        <h3>Automated Screening</h3>
+        <p>Natural language processing for resume analysis</p>
+        <div style="text-align: center; margin-top: 20px;">
+            <i data-feather="file-text" style="width: 48px; height: 48px; color: var(--primary-color);"></i>
+        </div>
+    </div>
+    <div class="feature-card">
+        <h3>Collaborative Hiring</h3>
+        <p>Team feedback and candidate evaluation tools</p>
+        <div style="text-align: center; margin-top: 20px;">
+            <i data-feather="users" style="width: 48px; height: 48px; color: var(--primary-color);"></i>
+        </div>
+    </div>
+</section>
+
+<section style="text-align: center; margin: 4rem 0;">
+    <h2>How It Works</h2>
+    <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 2rem; margin-top: 2rem;">
+        <div style="flex: 1; min-width: 250px; max-width: 350px;">
+            <div style="background-color: var(--secondary-color); width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto;">
+                <i data-feather="file-plus" style="width: 30px; height: 30px; color: white;"></i>
+            </div>
+            <h3>Upload Resume</h3>
+            <p>Candidates submit their resume through our simple application form</p>
+        </div>
+        <div style="flex: 1; min-width: 250px; max-width: 350px;">
+            <div style="background-color: var(--secondary-color); width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto;">
+                <i data-feather="cpu" style="width: 30px; height: 30px; color: white;"></i>
+            </div>
+            <h3>AI Analysis</h3>
+            <p>Our AI extracts key information and creates a detailed profile</p>
+        </div>
+        <div style="flex: 1; min-width: 250px; max-width: 350px;">
+            <div style="background-color: var(--secondary-color); width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto;">
+                <i data-feather="check-circle" style="width: 30px; height: 30px; color: white;"></i>
+            </div>
+            <h3>Smart Matching</h3>
+            <p>Candidates are automatically matched with relevant job openings</p>
+        </div>
+    </div>
+</section>
+{% endblock %}

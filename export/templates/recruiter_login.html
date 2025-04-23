@@ -1,0 +1,98 @@
+<!-- templates/recruiter_login.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <h2>Recruiter Login</h2>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required value="demo@example.com">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required value="password123">
+            </div>
+            <button type="submit" class="btn btn-primary">Login</button>
+        </form>
+        <div id="loginMessage" class="message-container"></div>
+        <div style="margin-top: 1rem; text-align: center; font-size: 0.875rem; color: #64748b;">
+            <p>Demo account: demo@example.com / password123</p>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const loginForm = document.getElementById('loginForm');
+    const loginMessage = document.getElementById('loginMessage');
+    
+    loginForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Clear previous messages
+        loginMessage.innerHTML = '';
+        
+        // Get form data
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        
+        // Create data object
+        const data = {
+            email: email,
+            password: password
+        };
+        
+        // Send login request
+        fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            if (response.ok) {
+                return response.json().then(data => {
+                    // Login successful, redirect if specified
+                    if (data.redirect) {
+                        window.location.href = data.redirect;
+                    } else {
+                        window.location.href = '/dashboard';
+                    }
+                });
+            } else {
+                // Login failed, show error message
+                return response.json().then(data => {
+                    loginMessage.innerHTML = `<div class="error-message">${data.error || 'Login failed'}</div>`;
+                });
+            }
+        })
+        .catch(error => {
+            loginMessage.innerHTML = `<div class="error-message">An error occurred: ${error.message}</div>`;
+        });
+    });
+});
+
+// Handle HTMX afterRequest events
+document.getElementById('loginForm').addEventListener('htmx:afterRequest', (evt) => {
+    const messageContainer = document.getElementById('loginMessage');
+    if (evt.detail.successful) {
+        // Handle successful login
+        const response = JSON.parse(evt.detail.xhr.responseText);
+        if (response.redirect) {
+            window.location.href = response.redirect;
+        }
+    } else {
+        // Show error message
+        try {
+            const error = JSON.parse(evt.detail.xhr.responseText).error;
+            messageContainer.innerHTML = `<div class="error-message">${error}</div>`;
+        } catch {
+            messageContainer.innerHTML = '<div class="error-message">Login failed</div>';
+        }
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,1074 @@
+{% extends "base.html" %}
+
+{% block page_title %}Candidate Profile{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="content-header-left">
+        <h1 class="content-title">Candidate Profile</h1>
+        <div class="badge bg-primary">ID: {{ candidate.id }}</div>
+    </div>
+    
+    <div class="content-header-actions">
+        <a href="{{ url_for('view_candidates') }}" class="btn btn-outline">
+            <i class="material-icons">arrow_back</i>
+            Back to Candidates
+        </a>
+        
+        {% if candidate.resume_file %}
+        <a href="{{ candidate.gcs_url }}" class="btn btn-primary" target="_blank">
+            <i class="material-icons">description</i>
+            View Resume
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="profile-layout">
+    <!-- Left Column: Candidate Information -->
+    <div class="profile-main">
+        <div class="card profile-card">
+            <div class="profile-header">
+                <div class="profile-avatar">
+                    {{ candidate.name[:1].upper() if candidate.name else "?" }}
+                </div>
+                <div class="profile-info">
+                    <h2 class="profile-name">{{ candidate.name or "Anonymous Candidate" }}</h2>
+                    <div class="profile-meta">
+                        {% if candidate.parsed_data and candidate.parsed_data.location %}
+                        <div class="profile-meta-item">
+                            <i class="material-icons">location_on</i>
+                            <span>{{ candidate.parsed_data.location }}</span>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="profile-meta-item">
+                            <i class="material-icons">calendar_today</i>
+                            <span>Joined {{ candidate.created_at|datetimeformat }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="profile-body">
+                <div class="profile-section">
+                    <h3 class="section-title">Contact Information</h3>
+                    <div class="contact-info">
+                        <div class="contact-item">
+                            <i class="material-icons">email</i>
+                            <span>{{ candidate.email or "No email provided" }}</span>
+                        </div>
+                        
+                        {% if candidate.phone %}
+                        <div class="contact-item">
+                            <i class="material-icons">phone</i>
+                            <span>{{ candidate.phone }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                {% if candidate.parsed_data and candidate.parsed_data.summary %}
+                <div class="profile-section">
+                    <h3 class="section-title">Summary</h3>
+                    <div class="summary-content">
+                        <p>{{ candidate.parsed_data.summary }}</p>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if candidate.parsed_data and candidate.parsed_data.skills %}
+                <div class="profile-section">
+                    <h3 class="section-title">Skills</h3>
+                    <div class="skills-container">
+                        {% for skill in candidate.parsed_data.skills %}
+                        <span class="chip skill-chip">{{ skill }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if candidate.parsed_data and candidate.parsed_data.experience %}
+                <div class="profile-section">
+                    <h3 class="section-title">Experience</h3>
+                    <div class="timeline">
+                        {% if candidate.parsed_data.experience is string %}
+                            <div class="timeline-item">
+                                <div class="timeline-content">
+                                    <p>{{ candidate.parsed_data.experience }}</p>
+                                </div>
+                            </div>
+                        {% else %}
+                            {% for exp in candidate.parsed_data.experience %}
+                            <div class="timeline-item">
+                                <div class="timeline-marker">
+                                    <i class="material-icons">business</i>
+                                </div>
+                                <div class="timeline-content">
+                                    <h4 class="timeline-title">
+                                        {{ exp.title or "Position" }}
+                                        {% if exp.company %}
+                                        <span class="company-name">at {{ exp.company }}</span>
+                                        {% endif %}
+                                    </h4>
+                                    {% if exp.years %}
+                                    <div class="timeline-period">{{ exp.years }}</div>
+                                    {% endif %}
+                                    {% if exp.description %}
+                                    <p class="timeline-description">{{ exp.description }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if candidate.parsed_data and candidate.parsed_data.education %}
+                <div class="profile-section">
+                    <h3 class="section-title">Education</h3>
+                    <div class="timeline">
+                        {% if candidate.parsed_data.education is string %}
+                            <div class="timeline-item">
+                                <div class="timeline-content">
+                                    <p>{{ candidate.parsed_data.education }}</p>
+                                </div>
+                            </div>
+                        {% else %}
+                            {% for edu in candidate.parsed_data.education %}
+                            <div class="timeline-item">
+                                <div class="timeline-marker">
+                                    <i class="material-icons">school</i>
+                                </div>
+                                <div class="timeline-content">
+                                    <h4 class="timeline-title">
+                                        {{ edu.degree or "Degree" }}
+                                        {% if edu.institution %}
+                                        <span class="institution-name">at {{ edu.institution }}</span>
+                                        {% endif %}
+                                    </h4>
+                                    {% if edu.years %}
+                                    <div class="timeline-period">{{ edu.years }}</div>
+                                    {% endif %}
+                                    {% if edu.field %}
+                                    <p class="timeline-description">{{ edu.field }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Right Column: Job Matches -->
+    <div class="profile-sidebar">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    Job Matches
+                    <span class="match-count">{{ matched_jobs|length }}</span>
+                </h3>
+            </div>
+            
+            <div class="card-body">
+                {% if matched_jobs %}
+                <div class="matches-list">
+                    {% for job in matched_jobs %}
+                    <div class="match-item">
+                        <div class="match-score-container">
+                            <div class="match-score {{ 'high' if job.match_score >= 70 else 'medium' if job.match_score >= 40 else 'low' }}">
+                                {{ job.match_score }}%
+                            </div>
+                        </div>
+                        <div class="match-details">
+                            <h4 class="match-title">{{ job.title }}</h4>
+                            {% if job.company %}
+                            <div class="match-company">
+                                <i class="material-icons">business</i>
+                                <span>{{ job.company }}</span>
+                            </div>
+                            {% endif %}
+                            <div class="match-actions">
+                                <a href="/jobs/{{ job.id }}" class="btn btn-sm btn-outline">View Job</a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-matches">
+                    <i class="material-icons">work_off</i>
+                    <p>No job matches found for this candidate</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Candidate Persona Card -->
+        <div class="card persona-card">
+            <div class="card-header">
+                <h3 class="card-title">Candidate Persona</h3>
+                {% if not candidate.persona %}
+                <button id="generatePersonaBtn" class="btn btn-sm btn-outline" onclick="generatePersona()">
+                    <i class="material-icons">psychology</i>
+                    Generate Persona
+                </button>
+                {% endif %}
+            </div>
+            
+            <div class="card-body">
+                {% if candidate.persona %}
+                <div class="persona-container">
+                    {% if candidate.persona.ideal_roles %}
+                    <div class="persona-section">
+                        <h4 class="persona-title">
+                            <i class="material-icons">work</i>
+                            Ideal Roles
+                        </h4>
+                        <ul class="persona-list">
+                            {% for role in candidate.persona.ideal_roles %}
+                            <li>{{ role }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    
+                    {% if candidate.persona.key_strengths %}
+                    <div class="persona-section">
+                        <h4 class="persona-title">
+                            <i class="material-icons">star</i>
+                            Key Strengths
+                        </h4>
+                        <ul class="persona-list">
+                            {% for strength in candidate.persona.key_strengths %}
+                            <li>{{ strength }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    
+                    {% if candidate.persona.growth_areas %}
+                    <div class="persona-section">
+                        <h4 class="persona-title">
+                            <i class="material-icons">trending_up</i>
+                            Growth Areas
+                        </h4>
+                        <ul class="persona-list">
+                            {% for area in candidate.persona.growth_areas %}
+                            <li>{{ area }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    
+                    {% if candidate.persona.team_fit %}
+                    <div class="persona-section">
+                        <h4 class="persona-title">
+                            <i class="material-icons">groups</i>
+                            Team Fit
+                        </h4>
+                        <p class="persona-text">{{ candidate.persona.team_fit }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="persona-empty">
+                    <i class="material-icons">psychology</i>
+                    <p>No persona data available. Generate a persona to get AI-driven insights about this candidate.</p>
+                </div>
+                {% endif %}
+                
+                <div id="personaMessage"></div>
+            </div>
+        </div>
+        
+        <!-- Candidate Analysis Card -->
+        <div class="card analysis-card">
+            <div class="card-header">
+                <h3 class="card-title">Candidate Analysis</h3>
+            </div>
+            
+            <div class="card-body">
+                <!-- Skills Analysis -->
+                <div class="analysis-section">
+                    <h4 class="analysis-title">Skills Coverage</h4>
+                    
+                    {% if candidate.parsed_data and candidate.parsed_data.skills %}
+                        {% set skills_count = candidate.parsed_data.skills|length %}
+                        <div class="progress-container">
+                            <div class="progress-label">
+                                <span>Skill Completeness</span>
+                                <span>{{ skills_count }} skills</span>
+                            </div>
+                            <div class="progress">
+                                {% if skills_count > 10 %}
+                                    <div class="progress-bar high" style="width: 100%"></div>
+                                {% elif skills_count > 5 %}
+                                    <div class="progress-bar medium" style="width: 75%"></div>
+                                {% elif skills_count > 0 %}
+                                    <div class="progress-bar low" style="width: 40%"></div>
+                                {% else %}
+                                    <div class="progress-bar very-low" style="width: 10%"></div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="analysis-empty">
+                            <i class="material-icons">format_list_bulleted</i>
+                            <p>No skills data available</p>
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Experience Analysis -->
+                <div class="analysis-section">
+                    <h4 class="analysis-title">Experience</h4>
+                    
+                    {% if candidate.parsed_data and candidate.parsed_data.experience %}
+                        {% if candidate.parsed_data.experience is string %}
+                            <div class="analysis-data">
+                                <i class="material-icons">business_center</i>
+                                <span>Experience detected</span>
+                            </div>
+                        {% else %}
+                            {% set exp_count = candidate.parsed_data.experience|length %}
+                            <div class="analysis-data">
+                                <i class="material-icons">business_center</i>
+                                <span>{{ exp_count }} position{{ 's' if exp_count != 1 }}</span>
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="analysis-empty">
+                            <i class="material-icons">business_center</i>
+                            <p>No experience data available</p>
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Resume Status -->
+                <div class="analysis-section">
+                    <h4 class="analysis-title">Resume Status</h4>
+                    
+                    {% if candidate.resume_file %}
+                        <div class="analysis-data success">
+                            <i class="material-icons">check_circle</i>
+                            <span>Resume available</span>
+                        </div>
+                    {% else %}
+                        <div class="analysis-data error">
+                            <i class="material-icons">error</i>
+                            <span>Resume missing</span>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Candidate Rating Card -->
+        <div class="card rating-card">
+            <div class="card-header">
+                <h3 class="card-title">Candidate Rating</h3>
+            </div>
+            
+            <div class="card-body">
+                <div class="rating-form">
+                    <form id="candidateRatingForm" hx-post="/api/candidates/{{ candidate.id }}/rate" hx-swap="outerHTML" hx-target="#ratingMessage">
+                        <div class="form-group">
+                            <label for="ratingScore">Score (0-1 scale)</label>
+                            <div class="range-slider-container">
+                                <input type="range" id="ratingScore" name="score" min="0" max="1" step="0.01" value="{{ candidate_rating.score if candidate_rating else 0.5 }}" class="range-slider">
+                                <span class="range-value" id="scoreValue">{{ candidate_rating.score if candidate_rating else 0.5 }}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="ratingNotes">Notes</label>
+                            <textarea id="ratingNotes" name="notes" class="form-control" rows="3" placeholder="Add your assessment notes">{{ candidate_rating.notes if candidate_rating else '' }}</textarea>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="material-icons">save</i>
+                                Save Rating
+                            </button>
+                        </div>
+                    </form>
+                    <div id="ratingMessage"></div>
+                </div>
+                
+                {% if candidate_ratings %}
+                <div class="rating-history">
+                    <h4 class="section-title">Rating History</h4>
+                    <div class="timeline">
+                    {% for rating in candidate_ratings %}
+                        <div class="timeline-item">
+                            <div class="timeline-marker">
+                                <i class="material-icons">star</i>
+                            </div>
+                            <div class="timeline-content">
+                                <h4 class="timeline-title">
+                                    Score: {{ rating.score }}
+                                    <span class="recruiter-name">by {{ rating.recruiter.name }}</span>
+                                </h4>
+                                <div class="timeline-period">{{ rating.created_at|datetimeformat }}</div>
+                                {% if rating.notes %}
+                                <p class="timeline-description">{{ rating.notes }}</p>
+                                {% endif %}
+                                
+                                {% if rating.recruiter_id == current_user.id %}
+                                <div class="rating-actions">
+                                    <button class="btn btn-sm btn-danger" 
+                                            hx-delete="/api/candidates/{{ candidate.id }}/ratings/{{ rating.id }}" 
+                                            hx-confirm="Are you sure you want to delete this rating?">
+                                        <i class="material-icons">delete</i>
+                                        Delete
+                                    </button>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Update range slider value display
+    document.addEventListener('DOMContentLoaded', function() {
+        const rangeSlider = document.getElementById('ratingScore');
+        const rangeValue = document.getElementById('scoreValue');
+        
+        if (rangeSlider && rangeValue) {
+            rangeSlider.addEventListener('input', function() {
+                rangeValue.textContent = this.value;
+            });
+        }
+    });
+    
+    // Function to generate candidate persona
+    function generatePersona() {
+        const candidateId = {{ candidate.id }};
+        const messageContainer = document.getElementById('personaMessage');
+        const button = document.getElementById('generatePersonaBtn');
+        
+        if (button) {
+            button.disabled = true;
+            button.innerHTML = '<i class="material-icons spin">refresh</i> Generating...';
+        }
+        
+        if (messageContainer) {
+            messageContainer.innerHTML = `
+                <div class="loading-message">
+                    <i class="material-icons spin">refresh</i>
+                    <span>Generating AI persona analysis... This may take a moment.</span>
+                </div>
+            `;
+        }
+        
+        fetch(`/api/candidates/${candidateId}/generate-persona`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': document.cookie.replace(/(?:(?:^|.*;\s*)access_token\s*\=\s*([^;]*).*$)|^.*$/, "$1")
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.persona) {
+                // Reload page to show the new persona
+                window.location.reload();
+            } else {
+                if (messageContainer) {
+                    messageContainer.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="material-icons">error</i>
+                            <span>Error generating persona: ${data.error || 'Unknown error'}</span>
+                        </div>
+                    `;
+                }
+                
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="material-icons">psychology</i> Generate Persona';
+                }
+            }
+        })
+        .catch(error => {
+            if (messageContainer) {
+                messageContainer.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="material-icons">error</i>
+                        <span>Error: ${error.message}</span>
+                    </div>
+                `;
+            }
+            
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = '<i class="material-icons">psychology</i> Generate Persona';
+            }
+        });
+    }
+</script>
+
+<style>
+    /* Profile Layout */
+    .profile-layout {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .profile-card {
+        height: 100%;
+    }
+    
+    .profile-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 1.5rem;
+        padding: 1.5rem;
+        background-color: var(--gray-50);
+        border-bottom: 1px solid var(--gray-200);
+    }
+    
+    .profile-avatar {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background-color: var(--primary-color);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 2rem;
+        flex-shrink: 0;
+    }
+    
+    .profile-name {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gray-800);
+        margin: 0 0 0.5rem;
+    }
+    
+    .profile-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    
+    .profile-meta-item {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        color: var(--gray-600);
+        font-size: 0.875rem;
+    }
+    
+    .profile-body {
+        padding: 1.5rem;
+    }
+    
+    .profile-section {
+        margin-bottom: 2rem;
+    }
+    
+    .profile-section:last-child {
+        margin-bottom: 0;
+    }
+    
+    .section-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--gray-800);
+        margin: 0 0 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--gray-200);
+    }
+    
+    .contact-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .contact-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--gray-700);
+    }
+    
+    .contact-item i {
+        color: var(--gray-500);
+    }
+    
+    .summary-content {
+        color: var(--gray-700);
+        line-height: 1.6;
+    }
+    
+    /* Timeline for Experience and Education */
+    .timeline {
+        position: relative;
+        margin-left: 1rem;
+    }
+    
+    .timeline:before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 8px;
+        height: 100%;
+        width: 2px;
+        background-color: var(--gray-200);
+    }
+    
+    .timeline-item {
+        position: relative;
+        padding-left: 2rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .timeline-item:last-child {
+        margin-bottom: 0;
+    }
+    
+    .timeline-marker {
+        position: absolute;
+        left: -4px;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background-color: var(--primary-color);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        z-index: 1;
+    }
+    
+    .timeline-marker i {
+        font-size: 1rem;
+    }
+    
+    .timeline-content {
+        position: relative;
+    }
+    
+    .timeline-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--gray-800);
+        margin: 0 0 0.25rem;
+    }
+    
+    .company-name, .institution-name {
+        font-weight: 400;
+        color: var(--gray-600);
+    }
+    
+    .timeline-period {
+        font-size: 0.875rem;
+        color: var(--gray-500);
+        margin-bottom: 0.5rem;
+    }
+    
+    .timeline-description {
+        font-size: 0.9375rem;
+        color: var(--gray-700);
+        line-height: 1.5;
+        margin: 0;
+    }
+    
+    /* Matches Card */
+    .match-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background-color: var(--gray-200);
+        color: var(--gray-700);
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-left: 0.5rem;
+    }
+    
+    .matches-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .match-item {
+        display: flex;
+        gap: 1rem;
+        padding: 1rem;
+        border-radius: var(--radius);
+        background-color: var(--gray-50);
+        border: 1px solid var(--gray-200);
+        transition: all 0.2s ease;
+    }
+    
+    .match-item:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-sm);
+    }
+    
+    .match-score-container {
+        flex-shrink: 0;
+    }
+    
+    .match-score {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.875rem;
+    }
+    
+    .match-score.high {
+        background-color: #d1fae5;
+        color: #065f46;
+    }
+    
+    .match-score.medium {
+        background-color: #fef3c7;
+        color: #92400e;
+    }
+    
+    .match-score.low {
+        background-color: #fee2e2;
+        color: #b91c1c;
+    }
+    
+    .match-details {
+        display: flex;
+        flex-direction: column;
+        flex-grow: 1;
+    }
+    
+    .match-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--gray-800);
+        margin: 0 0 0.375rem;
+    }
+    
+    .match-company {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.875rem;
+        color: var(--gray-600);
+        margin-bottom: 0.75rem;
+    }
+    
+    .match-company i {
+        font-size: 1rem;
+        color: var(--gray-500);
+    }
+    
+    .empty-matches {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        color: var(--gray-500);
+        text-align: center;
+    }
+    
+    .empty-matches i {
+        font-size: 2.5rem;
+        margin-bottom: 0.75rem;
+        color: var(--gray-400);
+    }
+    
+    /* Analysis Card */
+    .analysis-card {
+        margin-top: 1.5rem;
+    }
+    
+    /* Persona Card */
+    .persona-card {
+        margin-top: 1.5rem;
+    }
+    
+    .persona-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+    }
+    
+    .persona-section {
+        padding-bottom: 1.25rem;
+        border-bottom: 1px solid var(--gray-200);
+    }
+    
+    .persona-section:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+    
+    .persona-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--gray-800);
+        margin: 0 0 0.75rem;
+    }
+    
+    .persona-title i {
+        color: var(--primary-color);
+    }
+    
+    .persona-list {
+        margin: 0;
+        padding-left: 1.5rem;
+        color: var(--gray-700);
+    }
+    
+    .persona-list li {
+        margin-bottom: 0.5rem;
+        line-height: 1.5;
+    }
+    
+    .persona-list li:last-child {
+        margin-bottom: 0;
+    }
+    
+    .persona-text {
+        color: var(--gray-700);
+        line-height: 1.6;
+        margin: 0;
+    }
+    
+    .persona-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        color: var(--gray-500);
+        text-align: center;
+    }
+    
+    .persona-empty i {
+        font-size: 2.5rem;
+        margin-bottom: 0.75rem;
+        color: var(--gray-400);
+    }
+    
+    .loading-message {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background-color: var(--gray-100);
+        padding: 1rem;
+        border-radius: var(--radius);
+        margin-top: 1rem;
+        color: var(--gray-700);
+    }
+    
+    .loading-message i {
+        color: var(--primary-color);
+    }
+    
+    .spin {
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    /* Rating Card */
+    .rating-card {
+        margin-top: 1.5rem;
+    }
+    
+    .rating-form {
+        margin-bottom: 1.5rem;
+    }
+    
+    .range-slider-container {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .range-slider {
+        flex-grow: 1;
+        width: 100%;
+        height: 10px;
+        -webkit-appearance: none;
+        appearance: none;
+        background: var(--gray-200);
+        border-radius: 5px;
+        outline: none;
+    }
+    
+    .range-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--primary-color);
+        cursor: pointer;
+    }
+    
+    .range-slider::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--primary-color);
+        cursor: pointer;
+        border: none;
+    }
+    
+    .range-value {
+        font-weight: 600;
+        color: var(--gray-800);
+        min-width: 40px;
+        text-align: center;
+    }
+    
+    .recruiter-name {
+        font-weight: 400;
+        color: var(--gray-600);
+        font-size: 0.875rem;
+    }
+    
+    .rating-actions {
+        margin-top: 0.75rem;
+    }
+    
+    .analysis-section {
+        margin-bottom: 1.5rem;
+    }
+    
+    .analysis-section:last-child {
+        margin-bottom: 0;
+    }
+    
+    .analysis-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--gray-700);
+        margin: 0 0 0.75rem;
+    }
+    
+    .progress-container {
+        margin-bottom: 0.75rem;
+    }
+    
+    .progress-label {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.875rem;
+        color: var(--gray-600);
+        margin-bottom: 0.25rem;
+    }
+    
+    .progress {
+        height: 8px;
+        background-color: var(--gray-200);
+        border-radius: var(--radius-full);
+        overflow: hidden;
+    }
+    
+    .progress-bar {
+        height: 100%;
+        border-radius: var(--radius-full);
+    }
+    
+    .progress-bar.high {
+        background-color: #10b981;
+    }
+    
+    .progress-bar.medium {
+        background-color: #f59e0b;
+    }
+    
+    .progress-bar.low {
+        background-color: #ef4444;
+    }
+    
+    .progress-bar.very-low {
+        background-color: #9ca3af;
+    }
+    
+    .analysis-data {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--gray-700);
+    }
+    
+    .analysis-data i {
+        color: var(--gray-500);
+    }
+    
+    .analysis-data.success i {
+        color: #10b981;
+    }
+    
+    .analysis-data.error i {
+        color: #ef4444;
+    }
+    
+    .analysis-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 1rem;
+        color: var(--gray-500);
+        text-align: center;
+    }
+    
+    .analysis-empty i {
+        font-size: 1.5rem;
+        color: var(--gray-400);
+    }
+    
+    .analysis-empty p {
+        margin: 0;
+        font-size: 0.875rem;
+    }
+    
+    /* Responsive */
+    @media (max-width: 992px) {
+        .profile-layout {
+            grid-template-columns: 1fr;
+        }
+        
+        .profile-sidebar {
+            order: -1;
+        }
+    }
+</style>
+{% endblock %}

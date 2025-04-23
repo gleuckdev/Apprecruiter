@@ -1,0 +1,378 @@
+{% extends "base.html" %}
+
+{% block page_title %}Create Account{% endblock %}
+
+{% block content %}
+<div class="content-container">
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="auth-logo">
+                    <i class="material-icons logo-icon">group_add</i>
+                </div>
+                <h1 class="auth-title">Create Your Account</h1>
+                <p class="auth-subtitle">You've been invited to join AI Talent Pro</p>
+            </div>
+            
+            <div class="auth-body">
+                <div class="info-box">
+                    <div class="info-icon">
+                        <i class="material-icons">email</i>
+                    </div>
+                    <p>This invitation was sent to: <strong>{{ invitation.email }}</strong></p>
+                </div>
+                
+                <form id="joinForm">
+                    <input type="hidden" id="token" value="{{ token }}">
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="name">Full Name</label>
+                        <input 
+                            type="text" 
+                            id="name" 
+                            name="name" 
+                            class="form-control" 
+                            required 
+                            placeholder="Enter your full name"
+                            autocomplete="name">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="email">Email Address</label>
+                        <input 
+                            type="email" 
+                            id="email" 
+                            name="email" 
+                            class="form-control" 
+                            value="{{ invitation.email }}" 
+                            readonly
+                            autocomplete="email">
+                        <div class="form-hint">This email cannot be changed</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="password">Choose Password</label>
+                        <div class="password-field">
+                            <input 
+                                type="password" 
+                                id="password" 
+                                name="password" 
+                                class="form-control" 
+                                required 
+                                placeholder="Create a secure password"
+                                autocomplete="new-password">
+                            <button type="button" class="password-toggle" onclick="togglePassword('password')">
+                                <i class="material-icons">visibility_off</i>
+                            </button>
+                        </div>
+                        <div class="password-strength" id="passwordStrength"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="confirmPassword">Confirm Password</label>
+                        <div class="password-field">
+                            <input 
+                                type="password" 
+                                id="confirmPassword" 
+                                name="confirmPassword" 
+                                class="form-control" 
+                                required 
+                                placeholder="Confirm your password"
+                                autocomplete="new-password">
+                            <button type="button" class="password-toggle" onclick="togglePassword('confirmPassword')">
+                                <i class="material-icons">visibility_off</i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="formAlert" class="form-alert" style="display: none;"></div>
+                    
+                    <button type="submit" class="btn btn-primary btn-full">
+                        <i class="material-icons">person_add</i>
+                        Create Account
+                    </button>
+                </form>
+            </div>
+            
+            <div class="auth-footer">
+                <a href="{{ url_for('recruiter_login') }}" class="auth-link">
+                    <i class="material-icons">arrow_back</i>
+                    Back to Login
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const joinForm = document.getElementById('joinForm');
+        const formAlert = document.getElementById('formAlert');
+        const passwordInput = document.getElementById('password');
+        const confirmPassword = document.getElementById('confirmPassword');
+        const passwordStrength = document.getElementById('passwordStrength');
+        
+        // Password strength meter
+        passwordInput.addEventListener('input', function() {
+            const password = this.value;
+            let strength = 0;
+            let message = '';
+            
+            if (password.length >= 8) strength += 1;
+            if (password.match(/[a-z]/) && password.match(/[A-Z]/)) strength += 1;
+            if (password.match(/\d/)) strength += 1;
+            if (password.match(/[^a-zA-Z\d]/)) strength += 1;
+            
+            switch (strength) {
+                case 0:
+                    message = '<span class="strength-weak">Too short</span>';
+                    break;
+                case 1:
+                    message = '<span class="strength-weak">Weak</span>';
+                    break;
+                case 2:
+                    message = '<span class="strength-medium">Medium</span>';
+                    break;
+                case 3:
+                    message = '<span class="strength-good">Good</span>';
+                    break;
+                case 4:
+                    message = '<span class="strength-strong">Strong</span>';
+                    break;
+            }
+            
+            passwordStrength.innerHTML = message;
+        });
+        
+        // Form submission
+        joinForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Get form values
+            const token = document.getElementById('token').value;
+            const name = document.getElementById('name').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const password = passwordInput.value;
+            const passwordConfirm = confirmPassword.value;
+            
+            // Validation
+            if (!name) {
+                showAlert('Please enter your name', 'error');
+                return;
+            }
+            
+            if (password.length < 8) {
+                showAlert('Password must be at least 8 characters long', 'error');
+                return;
+            }
+            
+            if (password !== passwordConfirm) {
+                showAlert('Passwords do not match', 'error');
+                return;
+            }
+            
+            // Disable form and show loading
+            const submitBtn = joinForm.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="material-icons spin">refresh</i> Creating Account...';
+            
+            // Send request to API
+            fetch('/api/join', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    token: token,
+                    name: name,
+                    email: email,
+                    password: password
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message) {
+                    showAlert('Account created successfully! Redirecting...', 'success');
+                    // Redirect after successful account creation
+                    setTimeout(() => {
+                        window.location.href = data.redirect || '/dashboard';
+                    }, 1500);
+                } else {
+                    showAlert(data.error || 'An error occurred', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="material-icons">person_add</i> Create Account';
+                }
+            })
+            .catch(error => {
+                showAlert('Network error: ' + error.message, 'error');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="material-icons">person_add</i> Create Account';
+            });
+        });
+        
+        function showAlert(message, type) {
+            formAlert.innerHTML = message;
+            formAlert.className = 'form-alert ' + type;
+            formAlert.style.display = 'block';
+        }
+    });
+    
+    function togglePassword(inputId) {
+        const input = document.getElementById(inputId);
+        const icon = input.nextElementSibling.querySelector('i');
+        
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.textContent = 'visibility';
+        } else {
+            input.type = 'password';
+            icon.textContent = 'visibility_off';
+        }
+    }
+</script>
+
+<style>
+    .auth-container {
+        max-width: 480px;
+        margin: 2rem auto;
+    }
+    
+    .auth-card {
+        background-color: var(--card-background);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+    }
+    
+    .auth-header {
+        text-align: center;
+        padding: 2rem 1.5rem;
+        background-color: var(--gray-50);
+        border-bottom: 1px solid var(--gray-200);
+    }
+    
+    .auth-logo {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 1rem;
+    }
+    
+    .auth-logo .logo-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background-color: var(--primary-color);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+    }
+    
+    .auth-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gray-800);
+        margin: 0 0 0.5rem;
+    }
+    
+    .auth-subtitle {
+        font-size: 1rem;
+        color: var(--gray-600);
+        margin: 0;
+    }
+    
+    .auth-body {
+        padding: 2rem 1.5rem;
+    }
+    
+    .auth-footer {
+        border-top: 1px solid var(--gray-200);
+        padding: 1.5rem;
+        text-align: center;
+    }
+    
+    .auth-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--primary-color);
+        text-decoration: none;
+        font-weight: 500;
+        transition: color 0.2s;
+    }
+    
+    .auth-link:hover {
+        color: var(--primary-dark);
+    }
+    
+    .form-hint {
+        font-size: 0.8125rem;
+        color: var(--gray-500);
+        margin-top: 0.25rem;
+    }
+    
+    .form-alert {
+        padding: 0.75rem;
+        border-radius: var(--radius);
+        margin-bottom: 1.5rem;
+        font-size: 0.875rem;
+    }
+    
+    .form-alert.error {
+        background-color: #fee2e2;
+        color: #b91c1c;
+    }
+    
+    .form-alert.success {
+        background-color: #d1fae5;
+        color: #065f46;
+    }
+    
+    .password-field {
+        position: relative;
+    }
+    
+    .password-toggle {
+        position: absolute;
+        right: 0.625rem;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: var(--gray-500);
+        cursor: pointer;
+        padding: 0.25rem;
+    }
+    
+    .password-strength {
+        font-size: 0.8125rem;
+        margin-top: 0.25rem;
+    }
+    
+    .strength-weak {
+        color: #dc2626;
+    }
+    
+    .strength-medium {
+        color: #d97706;
+    }
+    
+    .strength-good {
+        color: #2563eb;
+    }
+    
+    .strength-strong {
+        color: #059669;
+    }
+    
+    .spin {
+        animation: spin 1.5s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}

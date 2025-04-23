@@ -1,0 +1,242 @@
+<!-- templates/jobs.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        line-height: 1;
+        text-align: center;
+        white-space: nowrap;
+        vertical-align: baseline;
+        border-radius: 0.25rem;
+        margin-left: 0.5rem;
+    }
+    
+    .bg-warning {
+        background-color: #fef3c7;
+        color: #92400e;
+    }
+    
+    .bg-primary {
+        background-color: #dbeafe;
+        color: #1e40af;
+    }
+    
+    .bg-success {
+        background-color: #d1fae5;
+        color: #065f46;
+    }
+    
+    .job-owner {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.875rem;
+        color: #4b5563;
+        background-color: #f3f4f6;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        margin-left: 0.5rem;
+    }
+    
+    .job-owner i {
+        font-size: 1rem;
+        color: #6b7280;
+    }
+    
+    .job-card.shared {
+        border-left: 3px solid var(--primary-color);
+    }
+    
+    .job-tabs {
+        display: flex;
+        margin-bottom: 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .job-tab {
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        color: var(--text-light);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s;
+    }
+    
+    .job-tab.active {
+        color: var(--primary-color);
+        border-bottom-color: var(--primary-color);
+    }
+    
+    .job-tab:hover:not(.active) {
+        color: var(--text-color);
+        border-bottom-color: var(--gray-300);
+    }
+    
+    .job-tab-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.5rem;
+        height: 1.5rem;
+        font-size: 0.75rem;
+        background-color: var(--gray-200);
+        color: var(--gray-700);
+        border-radius: 9999px;
+        margin-left: 0.5rem;
+    }
+    
+    .job-tab.active .job-tab-count {
+        background-color: var(--primary-light);
+        color: var(--primary-dark);
+    }
+</style>
+<div class="page-header">
+    <h1>{% if is_admin_view %}All Job Postings{% else %}My Job Postings{% endif %}</h1>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+</div>
+
+<div class="jobs-container">
+    <h2>
+        Jobs {% if is_admin_view %}<span class="badge bg-warning">Admin View</span>{% endif %}
+    </h2>
+    
+    {% if not is_admin_view and shared_jobs|length > 0 %}
+    <div class="job-tabs">
+        <div class="job-tab all active" onclick="showAllJobs()">
+            All Jobs <span class="job-tab-count">{{ jobs|length }}</span>
+        </div>
+        <div class="job-tab own" onclick="showOwnJobs()">
+            My Jobs <span class="job-tab-count">{{ own_jobs|length }}</span>
+        </div>
+        <div class="job-tab shared" onclick="showSharedJobs()">
+            Shared with Me <span class="job-tab-count">{{ shared_jobs|length }}</span>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="job-list">
+        {% if jobs %}
+            {% for job in jobs %}
+            <div class="job-card{% if job.recruiter_id != current_user.id %} shared{% endif %}" 
+                 data-owner="{{ 'own' if job.recruiter_id == current_user.id else 'shared' }}">
+                <h3>{{ job.title }}</h3>
+                <div class="job-meta">
+                    <span class="applicants">{{ job.matches|length if job.matches else 0 }} applicants</span>
+                    <span class="post-date">Posted on {{ job.created_at|datetimeformat }}</span>
+                    
+                    {% if job.recruiter_id != current_user.id %}
+                    {% set job_owner = recruiters[job.recruiter_id] if recruiters and job.recruiter_id in recruiters else None %}
+                    {% if job_owner %}
+                    <span class="job-owner">
+                        <i class="material-icons">share</i>
+                        Shared by: {{ job_owner.name }}
+                    </span>
+                    {% endif %}
+                    {% endif %}
+                </div>
+                <div class="job-details">
+                    <p><strong>Location:</strong> {{ job.location or 'Remote' }}</p>
+                    <p><strong>Experience:</strong> {{ job.experience or 'Not specified' }}</p>
+                    <p><strong>Company:</strong> {{ job.company or 'Not specified' }}</p>
+                    {% if job.salary_range %}
+                    <p><strong>Salary:</strong> {{ job.salary_range }}</p>
+                    {% endif %}
+                </div>
+                <div class="job-description">
+                    <p><strong>Description:</strong><br>
+                    {{ job.description[:200] }}{% if job.description|length > 200 %}...{% endif %}</p>
+                </div>
+                <div class="skills">
+                    <p><strong>Required Skills:</strong></p>
+                    {% if job.required_skills %}
+                        {% for skill in job.required_skills %}
+                        <span class="skill-tag">{{ skill }}</span>
+                        {% endfor %}
+                    {% else %}
+                        <span>None specified</span>
+                    {% endif %}
+                </div>
+                {% if job.preferred_skills %}
+                <div class="skills">
+                    <p><strong>Preferred Skills:</strong></p>
+                    {% for skill in job.preferred_skills %}
+                    <span class="skill-tag preferred">{{ skill }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                <button class="btn btn-primary"
+                        hx-get="/api/candidates/{{ job.id }}"
+                        hx-trigger="click"
+                        hx-target="#candidatesContainer"
+                        hx-swap="innerHTML">
+                    View Matching Candidates
+                </button>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <i data-feather="briefcase" style="width: 48px; height: 48px; color: var(--primary-color); margin-bottom: 1rem;"></i>
+                <h3>No Jobs Posted Yet</h3>
+                <p>Return to the dashboard and click "Create New Job" to post your first job.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<div id="candidatesContainer" class="candidates-grid"></div>
+
+<script>
+function showAllJobs() {
+    // Update tab states
+    document.querySelector('.job-tab.all').classList.add('active');
+    document.querySelector('.job-tab.own').classList.remove('active');
+    document.querySelector('.job-tab.shared').classList.remove('active');
+    
+    // Show all job cards
+    const jobCards = document.querySelectorAll('.job-card');
+    jobCards.forEach(card => {
+        card.style.display = 'block';
+    });
+}
+
+function showOwnJobs() {
+    // Update tab states
+    document.querySelector('.job-tab.all').classList.remove('active');
+    document.querySelector('.job-tab.own').classList.add('active');
+    document.querySelector('.job-tab.shared').classList.remove('active');
+    
+    // Show only own job cards
+    const jobCards = document.querySelectorAll('.job-card');
+    jobCards.forEach(card => {
+        if (card.dataset.owner === 'own') {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+function showSharedJobs() {
+    // Update tab states
+    document.querySelector('.job-tab.all').classList.remove('active');
+    document.querySelector('.job-tab.own').classList.remove('active');
+    document.querySelector('.job-tab.shared').classList.add('active');
+    
+    // Show only shared job cards
+    const jobCards = document.querySelectorAll('.job-card');
+    jobCards.forEach(card => {
+        if (card.dataset.owner === 'shared') {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+</script>
+{% endblock %}

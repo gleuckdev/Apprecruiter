@@ -1,0 +1,18 @@
+<!-- templates/error.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card" style="max-width: 600px;">
+        <h2>Oops! Something went wrong</h2>
+        
+        <div class="error-message">
+            {{ error }}
+        </div>
+        
+        <div style="margin-top: 2rem; text-align: center;">
+            <a href="/" class="btn btn-primary">Return to Home</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

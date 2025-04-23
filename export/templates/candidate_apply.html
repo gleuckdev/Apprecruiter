@@ -1,0 +1,39 @@
+<!-- templates/candidate_apply.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="upload-container">
+    <h2>Upload Your Resume</h2>
+    <p>Our AI will analyze your resume and match you with relevant job opportunities.</p>
+    
+    <form id="resumeUploadForm">
+        <div class="form-group">
+            <label for="name">Full Name</label>
+            <input type="text" id="name" name="name" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="phone">Phone</label>
+            <input type="tel" id="phone" name="phone">
+        </div>
+        
+        <div class="file-input-wrapper">
+            <label for="resume" class="file-input-label">
+                <i data-feather="upload-cloud" style="width: 48px; height: 48px; margin-bottom: 1rem;"></i>
+                <span>Drag & drop your resume here or click to browse</span>
+                <span class="file-name">No file selected</span>
+            </label>
+            <input type="file" id="resume" name="file" class="file-input" required accept=".pdf,.docx,.txt,.png,.jpg,.jpeg">
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Submit & Find Matches</button>
+    </form>
+    
+    <div id="uploadMessage" class="message-container"></div>
+</div>
+{% endblock %}

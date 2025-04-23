@@ -1,0 +1,491 @@
+<!-- templates/sharing.html -->
+{% extends "base.html" %}
+
+{% block page_title %}Sharing Management{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <h1 class="content-title">Data Sharing Management</h1>
+    <div class="content-header-actions">
+        <button class="btn btn-primary" onclick="showAddSharingForm()">
+            <i class="material-icons">add</i>
+            New Sharing
+        </button>
+    </div>
+</div>
+
+<div class="content-description">
+    <p>Manage your data sharing relationships with other recruiters. Control access to your jobs and candidates.</p>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Recruiters Who Can Access My Data</h2>
+    </div>
+    <div class="card-body">
+        {% if shared_with %}
+        <div class="sharing-list">
+            {% for sharing in shared_with %}
+            <div class="sharing-item">
+                <div class="sharing-details">
+                    <div class="sharing-user">
+                        <i class="material-icons">person</i>
+                        <div class="user-info">
+                            <span class="user-name">{{ sharing.shared_with.name }}</span>
+                            <span class="user-email">{{ sharing.shared_with.email }}</span>
+                        </div>
+                    </div>
+                    <div class="sharing-options">
+                        <div class="sharing-category {% if sharing.share_jobs %}active{% endif %}">
+                            <i class="material-icons">{% if sharing.share_jobs %}check_circle{% else %}cancel{% endif %}</i>
+                            <span>Jobs</span>
+                            <button class="toggle-btn" onclick="toggleSharing('{{ sharing.id }}', 'jobs', {{ 'false' if sharing.share_jobs else 'true' }})">
+                                {{ 'Revoke' if sharing.share_jobs else 'Grant' }}
+                            </button>
+                        </div>
+                        <div class="sharing-category {% if sharing.share_candidates %}active{% endif %}">
+                            <i class="material-icons">{% if sharing.share_candidates %}check_circle{% else %}cancel{% endif %}</i>
+                            <span>Candidates</span>
+                            <button class="toggle-btn" onclick="toggleSharing('{{ sharing.id }}', 'candidates', {{ 'false' if sharing.share_candidates else 'true' }})">
+                                {{ 'Revoke' if sharing.share_candidates else 'Grant' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="sharing-actions">
+                    <button class="btn btn-sm btn-outline-error" onclick="revokeSharingRelationship('{{ sharing.id }}')">
+                        <i class="material-icons">delete</i>
+                        Remove
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <i class="material-icons">share</i>
+            </div>
+            <h3 class="empty-state-title">No Sharing Relationships</h3>
+            <p class="empty-state-description">You haven't shared your data with any recruiters yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Data I Can Access</h2>
+    </div>
+    <div class="card-body">
+        {% if shared_by %}
+        <div class="sharing-list">
+            {% for sharing in shared_by %}
+            <div class="sharing-item">
+                <div class="sharing-details">
+                    <div class="sharing-user">
+                        <i class="material-icons">person</i>
+                        <div class="user-info">
+                            <span class="user-name">{{ sharing.owner.name }}</span>
+                            <span class="user-email">{{ sharing.owner.email }}</span>
+                        </div>
+                    </div>
+                    <div class="sharing-access">
+                        {% if sharing.share_jobs %}
+                        <span class="badge bg-success">
+                            <i class="material-icons">check</i>
+                            Jobs
+                        </span>
+                        {% endif %}
+                        {% if sharing.share_candidates %}
+                        <span class="badge bg-success">
+                            <i class="material-icons">check</i>
+                            Candidates
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <i class="material-icons">visibility_off</i>
+            </div>
+            <h3 class="empty-state-title">No Access to Other Data</h3>
+            <p class="empty-state-description">No other recruiters have shared their data with you.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add new sharing modal -->
+<div id="addSharingModal" class="modal" style="display:none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Add New Sharing Relationship</h3>
+            <button type="button" class="modal-close" onclick="hideAddSharingForm()">
+                <i class="material-icons">close</i>
+            </button>
+        </div>
+        
+        <div class="modal-body">
+            <div class="info-box">
+                <div class="info-icon">
+                    <i class="material-icons">info</i>
+                </div>
+                <p>Choose a recruiter and select what data you want to share with them.</p>
+            </div>
+            
+            <form id="addSharingForm">
+                <div class="form-group">
+                    <label class="form-label" for="recruiterSelect">Recruiter</label>
+                    <select id="recruiterSelect" name="recruiter_id" class="form-select" required>
+                        <option value="">Select a recruiter</option>
+                        {% for recruiter in available_recruiters %}
+                        <option value="{{ recruiter.id }}">{{ recruiter.name }} ({{ recruiter.email }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Sharing Options</label>
+                    <div class="checkbox-group">
+                        <div class="form-check">
+                            <input type="checkbox" id="shareJobsCheck" name="share_jobs" class="form-check-input">
+                            <label for="shareJobsCheck" class="form-check-label">
+                                Share my job listings with this recruiter
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" id="shareCandidatesCheck" name="share_candidates" class="form-check-input">
+                            <label for="shareCandidatesCheck" class="form-check-label">
+                                Share my candidates with this recruiter
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="hideAddSharingForm()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="material-icons">share</i>
+                        Create Sharing
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <div id="addSharingMessage" class="modal-message"></div>
+    </div>
+</div>
+
+<script>
+    // Show/hide modal functions
+    function showAddSharingForm() {
+        const modal = document.getElementById('addSharingModal');
+        if (modal) {
+            modal.style.display = 'flex';
+            setTimeout(() => {
+                modal.querySelector('.modal-content').style.opacity = '1';
+                modal.querySelector('.modal-content').style.transform = 'translateY(0)';
+            }, 10);
+            document.body.style.overflow = 'hidden';
+        }
+    }
+    
+    function hideAddSharingForm() {
+        const modal = document.getElementById('addSharingModal');
+        if (!modal) return;
+        
+        const content = modal.querySelector('.modal-content');
+        content.style.opacity = '0';
+        content.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+            
+            // Reset form and messages
+            document.getElementById('addSharingForm').reset();
+            document.getElementById('addSharingMessage').innerHTML = '';
+        }, 300);
+    }
+    
+    // Toggle sharing options
+    function toggleSharing(sharingId, type, enable) {
+        fetch(`/api/sharing/${sharingId}/${type}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': document.cookie.replace(/(?:(?:^|.*;\s*)access_token\s*\=\s*([^;]*).*$)|^.*$/, "$1")
+            },
+            body: JSON.stringify({ enabled: enable })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Reload page to show updated state
+                window.location.reload();
+            } else {
+                alert(data.error || 'Failed to update sharing settings');
+            }
+        })
+        .catch(error => {
+            alert(`Error: ${error.message}`);
+        });
+    }
+    
+    // Remove sharing relationship
+    function revokeSharingRelationship(sharingId) {
+        if (!confirm('Are you sure you want to remove this sharing relationship?')) return;
+        
+        fetch(`/api/sharing/${sharingId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': document.cookie.replace(/(?:(?:^|.*;\s*)access_token\s*\=\s*([^;]*).*$)|^.*$/, "$1")
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert(data.error || 'Failed to remove sharing relationship');
+            }
+        })
+        .catch(error => {
+            alert(`Error: ${error.message}`);
+        });
+    }
+    
+    // Form submission for new sharing relationship
+    document.addEventListener('DOMContentLoaded', function() {
+        const addSharingForm = document.getElementById('addSharingForm');
+        if (addSharingForm) {
+            addSharingForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const recruiterId = document.getElementById('recruiterSelect').value;
+                const shareJobs = document.getElementById('shareJobsCheck').checked;
+                const shareCandidates = document.getElementById('shareCandidatesCheck').checked;
+                const messageContainer = document.getElementById('addSharingMessage');
+                const submitBtn = this.querySelector('button[type="submit"]');
+                
+                if (!shareJobs && !shareCandidates) {
+                    messageContainer.innerHTML = `
+                        <div class="info-box" style="background-color: #fee2e2;">
+                            <div class="info-icon" style="background-color: #b91c1c;">
+                                <i class="material-icons">error</i>
+                            </div>
+                            <p style="color: #b91c1c;">
+                                <strong>Error:</strong> Please select at least one sharing option
+                            </p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Disable submit button and show loading state
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="material-icons spin">refresh</i> Creating...';
+                
+                fetch('/api/sharing', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': document.cookie.replace(/(?:(?:^|.*;\s*)access_token\s*\=\s*([^;]*).*$)|^.*$/, "$1")
+                    },
+                    body: JSON.stringify({ 
+                        shared_with_id: recruiterId,
+                        share_jobs: shareJobs,
+                        share_candidates: shareCandidates
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Show success message
+                        messageContainer.innerHTML = `
+                            <div class="info-box" style="background-color: #d1fae5;">
+                                <div class="info-icon" style="background-color: #065f46;">
+                                    <i class="material-icons">check_circle</i>
+                                </div>
+                                <p style="color: #065f46;">
+                                    <strong>Success!</strong><br>
+                                    Sharing relationship created successfully.
+                                </p>
+                            </div>
+                        `;
+                        
+                        // Reset form
+                        addSharingForm.reset();
+                        
+                        // Reload page after a delay
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        // Show error message
+                        messageContainer.innerHTML = `
+                            <div class="info-box" style="background-color: #fee2e2;">
+                                <div class="info-icon" style="background-color: #b91c1c;">
+                                    <i class="material-icons">error</i>
+                                </div>
+                                <p style="color: #b91c1c;">
+                                    <strong>Error:</strong> ${data.error || 'An unknown error occurred'}
+                                </p>
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    // Show error message
+                    messageContainer.innerHTML = `
+                        <div class="info-box" style="background-color: #fee2e2;">
+                            <div class="info-icon" style="background-color: #b91c1c;">
+                                <i class="material-icons">wifi_off</i>
+                            </div>
+                            <p style="color: #b91c1c;">
+                                <strong>Network error:</strong> ${error.message}
+                            </p>
+                        </div>
+                    `;
+                })
+                .finally(() => {
+                    // Reset submit button
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="material-icons">share</i> Create Sharing';
+                });
+            });
+        }
+    });
+</script>
+
+<style>
+    .sharing-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .sharing-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 1rem;
+        background-color: var(--card-background);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+    }
+    
+    .sharing-details {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        flex: 1;
+    }
+    
+    .sharing-user {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    
+    .sharing-user i {
+        font-size: 1.75rem;
+        color: var(--primary-color);
+        background-color: var(--primary-light);
+        padding: 0.5rem;
+        border-radius: 50%;
+    }
+    
+    .user-info {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .user-name {
+        font-weight: 600;
+        color: var(--text-color);
+    }
+    
+    .user-email {
+        font-size: 0.875rem;
+        color: var(--text-light);
+    }
+    
+    .sharing-options, .sharing-access {
+        display: flex;
+        gap: 1rem;
+        margin-top: 0.5rem;
+    }
+    
+    .sharing-category {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        border-radius: var(--radius);
+        background-color: var(--gray-100);
+        color: var(--gray-700);
+    }
+    
+    .sharing-category.active {
+        background-color: var(--primary-light);
+        color: var(--primary-dark);
+    }
+    
+    .sharing-category i {
+        font-size: 1.25rem;
+    }
+    
+    .toggle-btn {
+        margin-left: 0.5rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: var(--radius-sm);
+        border: none;
+        background-color: var(--gray-200);
+        color: var(--gray-700);
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .sharing-category.active .toggle-btn {
+        background-color: var(--error-color);
+        color: white;
+    }
+    
+    .sharing-category:not(.active) .toggle-btn {
+        background-color: var(--success-color);
+        color: white;
+    }
+    
+    .toggle-btn:hover {
+        opacity: 0.9;
+    }
+    
+    .sharing-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    @media (max-width: 768px) {
+        .sharing-item {
+            flex-direction: column;
+        }
+        
+        .sharing-actions {
+            margin-top: 1rem;
+            width: 100%;
+        }
+        
+        .sharing-options, .sharing-access {
+            flex-direction: column;
+        }
+    }
+</style>
+{% endblock %}

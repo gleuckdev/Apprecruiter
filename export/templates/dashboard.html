@@ -1,0 +1,475 @@
+<!-- templates/dashboard.html -->
+{% extends "base.html" %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-actions">
+    <div class="action-buttons">
+        <button class="btn btn-primary" onclick="showJobForm()">
+            <i class="material-icons">add</i>
+            Create New Job
+        </button>
+        <button id="refreshMatchesBtn" class="btn btn-secondary" onclick="refreshCandidateMatches()">
+            <i class="material-icons">refresh</i>
+            Refresh Matches
+        </button>
+    </div>
+    <div id="refreshResult" class="result-alert" style="display: none;"></div>
+</div>
+
+<section class="stats-grid">
+    <div class="card stat-card" onclick="window.location='{{ url_for('view_candidates') }}'">
+        <div class="card-body">
+            <div class="stat-icon bg-primary-light">
+                <i class="material-icons">people</i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-title">Candidates</h3>
+                <p class="stat-number">{{ total_candidates or 0 }}</p>
+                <div class="stat-action">
+                    <span>View All</span>
+                    <i class="material-icons">arrow_forward</i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card stat-card" onclick="window.location='{{ url_for('view_jobs') }}'">
+        <div class="card-body">
+            <div class="stat-icon bg-secondary-light">
+                <i class="material-icons">work</i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-title">Active Jobs</h3>
+                <p class="stat-number">{{ jobs|length }}</p>
+                <div class="stat-action">
+                    <span>View All</span>
+                    <i class="material-icons">arrow_forward</i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% if job_stats %}
+        {% for stat in job_stats %}
+        <div class="card stat-card" onclick="window.location='{{ url_for('get_candidates_for_job', job_id=stat.id) }}'">
+            <div class="card-body">
+                <div class="stat-icon bg-success-light">
+                    <i class="material-icons">assignment_ind</i>
+                </div>
+                <div class="stat-content">
+                    <h3 class="stat-title">{{ stat.title }}</h3>
+                    <p class="stat-number">{{ stat.applications }}</p>
+                    <div class="stat-action">
+                        <span>View Matches</span>
+                        <i class="material-icons">arrow_forward</i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% endif %}
+</section>
+
+<!-- Bulk Upload Resumes Section - Moved higher up for visibility -->
+<section class="bulk-upload-card">
+    <div class="section-heading">
+        <h2 class="section-title">Bulk Upload Resumes</h2>
+    </div>
+    
+    <div class="card">
+        <div class="card-body bulk-upload-section">
+            <p class="upload-limit-info">Upload up to 10 resumes at a time. Supported formats: PDF, DOCX, TXT, JPG, PNG.</p>
+            
+            <!-- Job selection dropdown -->
+            {% if jobs and jobs|length > 0 %}
+            <div class="job-selection">
+                <label class="block-label">Select Job Position</label>
+                <select id="targetJobId" name="job_id" required class="modern-select">
+                    <option value="">Choose a position</option>
+                    {% for job in jobs %}
+                    <option value="{{ job.id }}">{{ job.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            
+            <form id="bulkUploadForm" enctype="multipart/form-data">
+                <div class="upload-zone-modern" 
+                     ondragover="event.preventDefault()" 
+                     ondrop="handleDrop(event)">
+                    <div class="upload-icon">
+                        <i class="material-icons">cloud_upload</i>
+                    </div>
+                    <p class="upload-text">Drag & drop resumes here or</p>
+                    <input type="file" 
+                           id="bulkUploadInput" 
+                           name="files" 
+                           multiple 
+                           accept=".pdf,.docx,.txt,.png,.jpg,.jpeg"
+                           class="file-input-visible"
+                           onchange="handleFileSelection(this.files)">
+                </div>
+                
+                <div id="fileListContainer" class="file-list-container" style="display: none;">
+                    <ul id="fileList" class="file-list"></ul>
+                </div>
+                
+                <div id="processingStatus" class="processing-status" style="display: none;">
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div id="progressIndicator" class="progress-indicator"></div>
+                        </div>
+                        <div id="progressText" class="progress-text">Processing 0 of 0 resumes...</div>
+                    </div>
+                </div>
+                
+                <button type="button" id="uploadButton" class="btn btn-primary full-width" onclick="processBulkUpload()">
+                    <i class="material-icons">upload_file</i>
+                    Upload Selected Files
+                </button>
+                
+                <div id="bulkUploadResults"></div>
+            </form>
+        </div>
+    </div>
+</section>
+
+<div id="jobForm" class="modal" style="display:none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Create New Job Posting</h3>
+            <button type="button" class="modal-close" onclick="hideJobForm()">
+                <i class="material-icons">close</i>
+            </button>
+        </div>
+        
+        <div class="modal-body">
+            <div class="info-box">
+                <div class="info-icon">
+                    <i class="material-icons">lightbulb</i>
+                </div>
+                <p>Paste a complete job description and our AI will automatically extract all relevant details including skills, experience requirements, and more.</p>
+            </div>
+            
+            <form id="jobCreationForm">
+                <div class="form-group">
+                    <label class="form-label" for="jobDescription">Job Description</label>
+                    <textarea 
+                        id="jobDescription" 
+                        name="description" 
+                        rows="8" 
+                        class="form-control" 
+                        required 
+                        placeholder="Paste the complete job description here..."></textarea>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label class="form-label" for="jobLocation">Location (Optional)</label>
+                        <input 
+                            type="text" 
+                            id="jobLocation" 
+                            name="location" 
+                            class="form-control" 
+                            placeholder="e.g., San Francisco, Remote, etc.">
+                    </div>
+                    
+                    <div class="form-group col-md-6">
+                        <label class="form-label" for="jobExperience">Years of Experience (Optional)</label>
+                        <input 
+                            type="text" 
+                            id="jobExperience" 
+                            name="experience" 
+                            class="form-control" 
+                            placeholder="e.g., 3-5 years, 5+ years, etc.">
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="hideJobForm()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="material-icons">auto_awesome</i>
+                        Analyze & Create
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <div id="jobMessage" class="modal-message"></div>
+    </div>
+</div>
+
+{% if jobs and jobs|length > 0 %}
+<section class="section-heading">
+    <h2 class="section-title">Active Job Listings</h2>
+    <a href="{{ url_for('view_jobs') }}" class="btn btn-sm btn-outline">View All Jobs</a>
+</section>
+
+<div class="jobs-grid">
+    {% for job in jobs %}
+    <div class="card job-card">
+        <div class="card-header">
+            <h3 class="card-title">{{ job.title }}</h3>
+            <span class="badge {{ 'bg-success' if job.match_score > 70 else ('bg-warning' if job.match_score > 40 else 'bg-neutral') }}">
+                <i class="material-icons">{{ 'verified' if job.match_score > 70 else ('people' if job.match_score > 40 else 'people_outline') }}</i>
+                {{ job.match_score }}% Match
+            </span>
+        </div>
+        <div class="card-body">
+            <div class="job-meta">
+                <div class="job-meta-item">
+                    <i class="material-icons">location_on</i>
+                    <span>{{ job.location or 'Remote' }}</span>
+                </div>
+                <div class="job-meta-item">
+                    <i class="material-icons">work</i>
+                    <span>{{ job.experience or 'Not specified' }}</span>
+                </div>
+            </div>
+            
+            <div class="job-description">
+                {{ job.description[:150] }}{% if job.description|length > 150 %}...{% endif %}
+            </div>
+            
+            <div class="skills-container">
+                {% if job.required_skills %}
+                    {% for skill in job.required_skills %}
+                    <span class="chip skill-chip">{{ skill }}</span>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+        <div class="card-footer">
+            <a href="{{ url_for('get_candidates_for_job', job_id=job.id) }}" class="btn btn-primary">
+                <i class="material-icons">people</i>
+                View Candidates
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state card">
+    <div class="empty-state-icon">
+        <i class="material-icons">work_off</i>
+    </div>
+    <h3 class="empty-state-title">No Jobs Posted Yet</h3>
+    <p class="empty-state-description">Click "Create New Job" to post your first job and start finding candidates.</p>
+    <button class="btn btn-primary" onclick="showJobForm()">
+        <i class="material-icons">add</i>
+        Create New Job
+    </button>
+</div>
+{% endif %}
+
+<div id="candidatesContainer" class="candidates-grid"></div>
+
+<script>
+    // Function to refresh candidate matches
+    async function refreshCandidateMatches() {
+        const refreshBtn = document.getElementById('refreshMatchesBtn');
+        const resultDiv = document.getElementById('refreshResult');
+        
+        // Disable button and show loading state
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = 'Refreshing matches...';
+        resultDiv.innerHTML = 'Recalculating matches with 30% threshold...';
+        resultDiv.className = 'refresh-result info';
+        resultDiv.style.display = 'block';
+        
+        try {
+            const response = await fetch('/api/matches/refresh', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const data = await response.json();
+            
+            // Show result
+            resultDiv.innerHTML = data.message || data.error;
+            resultDiv.className = `refresh-result ${data.success ? 'success' : 'error'}`;
+            
+            // If successful, reload page after 2 seconds to show new matches
+            if (data.success) {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            }
+        } catch (error) {
+            resultDiv.innerHTML = `Error: ${error.message}`;
+            resultDiv.className = 'refresh-result error';
+        } finally {
+            // Reset button state after 3 seconds
+            setTimeout(() => {
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = 'Refresh Candidate Matches';
+            }, 3000);
+        }
+    }
+
+    let uploadedFiles = [];
+    let processedCount = 0;
+    let totalFiles = 0;
+    let processingInterval;
+
+    function handleDrop(e) {
+        e.preventDefault();
+        const files = e.dataTransfer.files;
+        handleFileSelection(files);
+    }
+
+    function handleFileSelection(files) {
+        // Limit to 10 files
+        const selectedFiles = Array.from(files).slice(0, 10);
+        
+        if (selectedFiles.length < files.length) {
+            alert('Only the first 10 files will be processed. Please split large batches into multiple uploads.');
+        }
+        
+        uploadedFiles = selectedFiles;
+        updateFileList();
+    }
+
+    function updateFileList() {
+        const fileListContainer = document.getElementById('fileListContainer');
+        const fileList = document.getElementById('fileList');
+        
+        if (uploadedFiles.length > 0) {
+            fileListContainer.style.display = 'block';
+            
+            fileList.innerHTML = uploadedFiles.map(file => 
+                `<li class="file-item">
+                    <span class="file-name">${file.name}</span>
+                    <span class="file-status">QUEUED</span>
+                </li>`
+            ).join('');
+        } else {
+            fileListContainer.style.display = 'none';
+            fileList.innerHTML = '';
+        }
+        
+        // Update the upload button state
+        const uploadButton = document.getElementById('uploadButton');
+        uploadButton.disabled = uploadedFiles.length === 0;
+    }
+    
+    function startProcessingAnimation() {
+        // Reset counters
+        processedCount = 0;
+        totalFiles = uploadedFiles.length;
+        
+        // Show processing status
+        const processingStatus = document.getElementById('processingStatus');
+        processingStatus.style.display = 'block';
+        
+        // Update progress text
+        const progressText = document.getElementById('progressText');
+        progressText.textContent = `Processing 0 of ${totalFiles} resumes...`;
+        
+        // Reset progress bar
+        const progressIndicator = document.getElementById('progressIndicator');
+        progressIndicator.style.width = '0%';
+        
+        // Disable upload button
+        document.getElementById('uploadButton').disabled = true;
+        
+        // Start animation interval
+        processingInterval = setInterval(() => {
+            // Increment processed count (simulate progress)
+            if (processedCount < totalFiles) {
+                processedCount++;
+                const percentage = Math.round((processedCount / totalFiles) * 100);
+                
+                // Update progress bar
+                progressIndicator.style.width = `${percentage}%`;
+                
+                // Update text
+                progressText.textContent = `Processing ${processedCount} of ${totalFiles} resumes...`;
+                
+                // If all files processed in animation, clear interval
+                if (processedCount >= totalFiles) {
+                    clearInterval(processingInterval);
+                    progressText.textContent = `Processing complete. Finalizing...`;
+                }
+            }
+        }, 800); // Update every 800ms for a smooth animation
+    }
+    
+    function stopProcessingAnimation() {
+        clearInterval(processingInterval);
+        document.getElementById('processingStatus').style.display = 'none';
+        document.getElementById('uploadButton').disabled = false;
+    }
+
+    async function processBulkUpload() {
+        if (uploadedFiles.length === 0) {
+            alert('Please select files to upload');
+            return;
+        }
+        
+        // Check if job is selected (if dropdown exists)
+        const jobSelector = document.getElementById('targetJobId');
+        if (jobSelector && jobSelector.value === '') {
+            alert('Please select a job position for these candidates');
+            return;
+        }
+        
+        // Start processing animation
+        startProcessingAnimation();
+        
+        const formData = new FormData();
+        uploadedFiles.forEach(file => formData.append('files', file));
+        
+        // Add job ID if available
+        if (jobSelector) {
+            formData.append('job_id', jobSelector.value);
+        }
+
+        try {
+            const response = await fetch('/api/candidates/bulk', {
+                method: 'POST',
+                body: formData
+            });
+            
+            // Stop animation
+            stopProcessingAnimation();
+            
+            if (!response.ok) {
+                throw new Error(`Server responded with status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            renderUploadResults(data.results);
+        } catch (error) {
+            console.error('Upload failed:', error);
+            // Stop animation
+            stopProcessingAnimation();
+            
+            const resultsDiv = document.getElementById('bulkUploadResults');
+            resultsDiv.innerHTML = `<div class="upload-result error">
+                <span class="status">ERROR</span>
+                <span class="message">Upload failed: ${error.message}</span>
+            </div>`;
+        }
+    }
+
+    function renderUploadResults(results) {
+        const resultsDiv = document.getElementById('bulkUploadResults');
+        resultsDiv.innerHTML = results.map(result => `
+            <div class="upload-result ${result.status}">
+                <span class="filename">${result.filename}</span>
+                <span class="status">${result.status.toUpperCase()}</span>
+                ${result.message ? `<span class="message">${result.message}</span>` : ''}
+            </div>
+        `).join('');
+        
+        // Reset uploaded files after processing
+        uploadedFiles = [];
+        updateFileList();
+    }
+</script>
+{% endblock %}

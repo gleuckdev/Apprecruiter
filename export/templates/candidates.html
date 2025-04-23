@@ -1,0 +1,735 @@
+<!-- templates/candidates.html -->
+{% extends "base.html" %}
+
+{% block page_title %}Candidates{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="content-header-left">
+        <h1 class="content-title">Candidate Directory</h1>
+        <div class="badge bg-primary">{{ candidates|length }} candidates</div>
+    </div>
+    
+    <div class="content-header-actions">
+        <div class="search-container">
+            <i class="material-icons search-icon">search</i>
+            <input type="text" class="form-control search-input" placeholder="Search candidates..." id="candidateSearch" onkeyup="searchCandidates()">
+        </div>
+        
+        <button class="btn btn-primary" onclick="showInviteForm()">
+            <i class="material-icons">person_add</i>
+            Invite Recruiter
+        </button>
+    </div>
+</div>
+
+<div class="section-header">
+    <div>
+        <h2 class="section-title">Candidates</h2>
+        {% if is_admin_view %}
+        <span class="badge bg-warning">Admin View</span>
+        {% endif %}
+    </div>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline">
+        <i class="material-icons">dashboard</i>
+        Back to Dashboard
+    </a>
+</div>
+
+{% if not is_admin_view and shared_candidates|length > 0 %}
+<div class="job-tabs candidate-tabs">
+    <div class="job-tab all active" onclick="showAllCandidates()">
+        All Candidates <span class="job-tab-count">{{ candidates|length }}</span>
+    </div>
+    <div class="job-tab own" onclick="showOwnCandidates()">
+        My Candidates <span class="job-tab-count">{{ own_candidates|length }}</span>
+    </div>
+    <div class="job-tab shared" onclick="showSharedCandidates()">
+        Shared with Me <span class="job-tab-count">{{ shared_candidates|length }}</span>
+    </div>
+</div>
+{% endif %}
+
+{% if candidates %}
+<div class="candidates-list-container">
+    <div class="candidates-list">
+        <div class="candidates-list-header">
+            <div class="candidate-col candidate-name-col">Candidate</div>
+            <div class="candidate-col candidate-skills-col">Key Skills</div>
+            <div class="candidate-col candidate-score-col">Match Score</div>
+            <div class="candidate-col candidate-actions-col">Actions</div>
+        </div>
+        
+        {% for candidate in candidates %}
+        <div class="candidate-list-item{% if candidate.uploaded_by != current_user.id %} shared{% endif %}"
+             data-candidate-id="{{ candidate.id }}"
+             data-owner="{{ 'own' if candidate.uploaded_by == current_user.id else 'shared' }}">
+            <div class="candidate-col candidate-name-col">
+                <div class="candidate-avatar">
+                    {{ candidate.name[:1].upper() if candidate.name else "?" }}
+                </div>
+                <div class="candidate-info">
+                    <div class="candidate-name">{{ candidate.name or "Anonymous Candidate" }}</div>
+                    <div class="candidate-contact">
+                        <span class="candidate-email">{{ candidate.email or "No email provided" }}</span>
+                        {% if candidate.phone %}
+                        <span class="candidate-phone">{{ candidate.phone }}</span>
+                        {% endif %}
+                        
+                        {% if candidate.uploaded_by and candidate.uploaded_by != current_user.id %}
+                            {% set recruiter = recruiters[candidate.uploaded_by] if recruiters and candidate.uploaded_by in recruiters else None %}
+                            <span class="candidate-shared-by">
+                                Shared by: {{ recruiter.name if recruiter else 'Unknown' }}
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="candidate-col candidate-skills-col">
+                <div class="skills-tags">
+                    {% if candidate.parsed_data and candidate.parsed_data.skills and candidate.parsed_data.skills|length > 0 %}
+                        {% for skill in candidate.parsed_data.skills[:3] %}
+                        <span class="skill-tag">{{ skill }}</span>
+                        {% endfor %}
+                        {% if candidate.parsed_data.skills|length > 3 %}
+                        <span class="more-skills">+{{ candidate.parsed_data.skills|length - 3 }}</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="no-skills">No skills listed</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="candidate-col candidate-score-col">
+                {% set match_count = candidate.matches|length %}
+                {% set max_score = 0 %}
+                {% if match_count > 0 %}
+                    {% for match in candidate.matches %}
+                        {% if match.score > max_score %}
+                            {% set max_score = match.score %}
+                        {% endif %}
+                    {% endfor %}
+                    <div class="match-score-badge 
+                        {{ 'high' if max_score >= 0.7 else 'medium' if max_score >= 0.4 else 'low' }}">
+                        {{ (max_score * 100)|round|int }}%
+                    </div>
+                    <div class="score-label">Best Match</div>
+                {% else %}
+                    <div class="match-score-badge low">N/A</div>
+                    <div class="score-label">No Matches</div>
+                {% endif %}
+            </div>
+            
+            <div class="candidate-col candidate-actions-col">
+                <div class="candidate-actions">
+                    <button class="btn btn-outline btn-sm view-profile-btn" 
+                            onclick="showCandidateProfile({{ loop.index0 }})">
+                        <i class="material-icons">visibility</i>
+                        Quick View
+                    </button>
+                    <a href="{{ url_for('view_candidate_detail', candidate_id=candidate.id) }}" class="btn btn-outline btn-sm">
+                        <i class="material-icons">person</i>
+                        Full Profile
+                    </a>
+                    {% if candidate.resume_file %}
+                    <a href="{{ candidate.gcs_url }}" target="_blank" class="btn btn-primary btn-sm">
+                        <i class="material-icons">description</i>
+                        Resume
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Candidate Profile Modal -->
+<div id="candidateProfileModal" class="modal" style="display:none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Candidate Profile</h3>
+            <button type="button" class="modal-close" onclick="hideProfileModal()">
+                <i class="material-icons">close</i>
+            </button>
+        </div>
+        
+        <div class="modal-body">
+            <div id="profileContainer" class="profile-container">
+                <!-- Profile content will be injected here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Store candidate data for modal display
+const candidateData = [
+    {% for candidate in candidates %}
+    {
+        id: {{ candidate.id }},
+        name: "{{ candidate.name or 'Anonymous Candidate' }}",
+        email: "{{ candidate.email or 'No email provided' }}",
+        phone: "{{ candidate.phone or '' }}",
+        skills: {{ (candidate.parsed_data.skills if candidate.parsed_data and candidate.parsed_data.skills else [])|tojson }},
+        experience: {{ (candidate.parsed_data.experience if candidate.parsed_data and candidate.parsed_data.experience else [])|tojson }},
+        resumeUrl: "{{ candidate.gcs_url if candidate.resume_file else '' }}"
+    }{{ "," if not loop.last }}
+    {% endfor %}
+];
+
+function showCandidateProfile(index) {
+    const candidate = candidateData[index];
+    const profileContainer = document.getElementById('profileContainer');
+    
+    // Create profile HTML
+    let profileHtml = `
+        <div class="profile-header">
+            <div class="profile-avatar large">
+                ${candidate.name.charAt(0).toUpperCase()}
+            </div>
+            <div class="profile-title">
+                <h2 class="profile-name">${candidate.name}</h2>
+                <div class="profile-meta">
+                    <div class="profile-meta-item">
+                        <i class="material-icons">email</i>
+                        <span>${candidate.email}</span>
+                    </div>
+                    ${candidate.phone ? `
+                    <div class="profile-meta-item">
+                        <i class="material-icons">phone</i>
+                        <span>${candidate.phone}</span>
+                    </div>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+        
+        <div class="profile-section">
+            <h3 class="section-title">Skills</h3>
+            <div class="profile-skills">
+                ${candidate.skills && candidate.skills.length > 0 ? 
+                  candidate.skills.map(skill => `<span class="skill-tag">${skill}</span>`).join('') 
+                  : '<p class="no-data">No skills information available</p>'}
+            </div>
+        </div>
+        
+        <div class="profile-section">
+            <h3 class="section-title">Experience</h3>
+            ${renderExperience(candidate.experience)}
+        </div>
+        
+        <div class="profile-actions">
+            <a href="/candidates/${candidate.id}" class="btn btn-primary">
+                <i class="material-icons">person</i>
+                View Full Profile
+            </a>
+            ${candidate.resumeUrl ? `
+            <a href="${candidate.resumeUrl}" target="_blank" class="btn btn-outline">
+                <i class="material-icons">description</i>
+                View Resume
+            </a>
+            ` : ''}
+        </div>
+    `;
+    
+    profileContainer.innerHTML = profileHtml;
+    
+    // Show modal
+    const modal = document.getElementById('candidateProfileModal');
+    modal.style.display = 'flex';
+    setTimeout(() => {
+        modal.querySelector('.modal-content').style.opacity = '1';
+        modal.querySelector('.modal-content').style.transform = 'translateY(0)';
+    }, 10);
+    document.body.style.overflow = 'hidden';
+}
+
+function renderExperience(experience) {
+    if (!experience || experience.length === 0) {
+        return '<p class="no-data">No experience information available</p>';
+    }
+    
+    if (typeof experience === 'string') {
+        return `<p>${experience}</p>`;
+    }
+    
+    let html = '<div class="timeline">';
+    
+    for (const exp of experience) {
+        html += `
+            <div class="timeline-item">
+                <div class="timeline-marker">
+                    <i class="material-icons">business</i>
+                </div>
+                <div class="timeline-content">
+                    <h4 class="timeline-title">
+                        ${exp.title || 'Position'}
+                        ${exp.company ? `<span class="company-name">at ${exp.company}</span>` : ''}
+                    </h4>
+                    ${exp.years ? `<div class="timeline-period">${exp.years}</div>` : ''}
+                    ${exp.description ? `<p class="timeline-description">${exp.description}</p>` : ''}
+                </div>
+            </div>
+        `;
+    }
+    
+    html += '</div>';
+    return html;
+}
+
+function hideProfileModal() {
+    const modal = document.getElementById('candidateProfileModal');
+    if (!modal) return;
+    
+    const content = modal.querySelector('.modal-content');
+    content.style.opacity = '0';
+    content.style.transform = 'translateY(20px)';
+    
+    setTimeout(() => {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }, 300);
+}
+</script>
+{% else %}
+<div class="empty-state card">
+    <div class="empty-state-icon">
+        <i class="material-icons">people</i>
+    </div>
+    <h3 class="empty-state-title">No Candidates Found</h3>
+    <p class="empty-state-description">Upload resumes from the dashboard to add candidates to your database.</p>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-primary">
+        <i class="material-icons">upload_file</i>
+        Upload Resumes
+    </a>
+</div>
+{% endif %}
+
+<!-- Invite Recruiter Modal -->
+<div id="inviteModal" class="modal" style="display:none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Invite New Recruiter</h3>
+            <button type="button" class="modal-close" onclick="hideInviteForm()">
+                <i class="material-icons">close</i>
+            </button>
+        </div>
+        
+        <div class="modal-body">
+            <div class="info-box">
+                <div class="info-icon">
+                    <i class="material-icons">info</i>
+                </div>
+                <p>Send an invitation to a new recruiter. They will receive a link to create their account with the selected role.</p>
+            </div>
+            
+            <form id="inviteForm">
+                <div class="form-group">
+                    <label class="form-label" for="inviteEmail">Email Address</label>
+                    <input 
+                        type="email" 
+                        id="inviteEmail" 
+                        name="email" 
+                        class="form-control" 
+                        required 
+                        placeholder="colleague@company.com">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="inviteRole">Role</label>
+                    <select id="inviteRole" name="role" class="form-select">
+                        <option value="recruiter">Recruiter</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Data Sharing Options</label>
+                    <div class="checkbox-group">
+                        <div class="form-check">
+                            <input type="checkbox" id="shareJobs" name="shareJobs" class="form-check-input">
+                            <label for="shareJobs" class="form-check-label">
+                                Share my job listings with this recruiter
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" id="shareCandidates" name="shareCandidates" class="form-check-input">
+                            <label for="shareCandidates" class="form-check-label">
+                                Share my candidates with this recruiter
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-hint">
+                        This enables collaboration on your data while maintaining privacy control.
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="hideInviteForm()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="material-icons">send</i>
+                        Send Invitation
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <div id="inviteMessage" class="modal-message"></div>
+    </div>
+</div>
+
+<!-- Invitation Management Section (Admin only) -->
+{% if current_user.is_admin() %}
+<div id="invitationsSection" class="card" style="margin-top: 2rem;">
+    <div class="card-header">
+        <h3 class="card-title">Pending Invitations</h3>
+        <button id="refreshInvitesBtn" class="btn btn-sm btn-secondary" onclick="loadInvitations()">
+            <i class="material-icons">refresh</i>
+            Refresh
+        </button>
+    </div>
+    
+    <div class="card-body">
+        <div id="invitationsList" class="invitation-list">
+            <div class="loading-indicator">
+                <i class="material-icons spin">refresh</i>
+                <span>Loading invitations...</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+    function searchCandidates() {
+        const searchInput = document.getElementById('candidateSearch').value.toLowerCase();
+        const candidateCards = document.querySelectorAll('.candidate-card');
+        
+        candidateCards.forEach(card => {
+            const name = card.querySelector('.candidate-name').innerText.toLowerCase();
+            const email = card.querySelector('.candidate-email').innerText.toLowerCase();
+            const experience = card.querySelector('.candidate-experience')?.innerText.toLowerCase() || '';
+            const skills = Array.from(card.querySelectorAll('.skill-chip')).map(el => el.innerText.toLowerCase());
+            
+            if (
+                name.includes(searchInput) || 
+                email.includes(searchInput) || 
+                experience.includes(searchInput) ||
+                skills.some(skill => skill.includes(searchInput))
+            ) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+    
+    // Invitation Modal Functions
+    function showInviteForm() {
+        const modal = document.getElementById('inviteModal');
+        if (modal) {
+            modal.style.display = 'flex';
+            setTimeout(() => {
+                modal.querySelector('.modal-content').style.opacity = '1';
+                modal.querySelector('.modal-content').style.transform = 'translateY(0)';
+            }, 10);
+            document.body.style.overflow = 'hidden';
+        }
+    }
+    
+    function hideInviteForm() {
+        const modal = document.getElementById('inviteModal');
+        if (!modal) return;
+        
+        const content = modal.querySelector('.modal-content');
+        content.style.opacity = '0';
+        content.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+            
+            // Reset form and messages
+            document.getElementById('inviteForm').reset();
+            document.getElementById('inviteMessage').innerHTML = '';
+        }, 300);
+    }
+    
+    // Load Invitations Function (Admin only)
+    // Candidate Tab Filter Functions
+    function showAllCandidates() {
+        // Update tab states
+        document.querySelector('.job-tab.all').classList.add('active');
+        document.querySelector('.job-tab.own').classList.remove('active');
+        document.querySelector('.job-tab.shared').classList.remove('active');
+        
+        // Show all candidate cards
+        const candidateCards = document.querySelectorAll('.candidate-card');
+        candidateCards.forEach(card => {
+            card.style.display = '';
+        });
+    }
+
+    function showOwnCandidates() {
+        // Update tab states
+        document.querySelector('.job-tab.all').classList.remove('active');
+        document.querySelector('.job-tab.own').classList.add('active');
+        document.querySelector('.job-tab.shared').classList.remove('active');
+        
+        // Show only own candidate cards
+        const candidateCards = document.querySelectorAll('.candidate-card');
+        candidateCards.forEach(card => {
+            if (card.dataset.owner === 'own') {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+
+    function showSharedCandidates() {
+        // Update tab states
+        document.querySelector('.job-tab.all').classList.remove('active');
+        document.querySelector('.job-tab.own').classList.remove('active');
+        document.querySelector('.job-tab.shared').classList.add('active');
+        
+        // Show only shared candidate cards
+        const candidateCards = document.querySelectorAll('.candidate-card');
+        candidateCards.forEach(card => {
+            if (card.dataset.owner === 'shared') {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+    
+    function loadInvitations() {
+        const listContainer = document.getElementById('invitationsList');
+        if (!listContainer) return;
+        
+        listContainer.innerHTML = `<div class="loading-indicator">
+            <i class="material-icons spin">refresh</i>
+            <span>Loading invitations...</span>
+        </div>`;
+        
+        fetch('/api/invites', {
+            headers: {
+                'Authorization': document.cookie.replace(/(?:(?:^|.*;\s*)access_token\s*\=\s*([^;]*).*$)|^.*$/, "$1")
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.invites && data.invites.length > 0) {
+                const invitesHtml = data.invites.map(invite => `
+                    <div class="invitation-item">
+                        <div class="invitation-details">
+                            <div class="invitation-email">
+                                <i class="material-icons">email</i>
+                                <span>${invite.email}</span>
+                            </div>
+                            <div class="invitation-meta">
+                                <span class="invitation-role badge ${invite.role === 'admin' ? 'bg-warning' : 'bg-primary'}">
+                                    ${invite.role}
+                                </span>
+                                <span class="invitation-date">
+                                    <i class="material-icons">schedule</i>
+                                    Expires: ${new Date(invite.expires_at).toLocaleDateString()}
+                                </span>
+                                <div class="invitation-sharing">
+                                    <span class="badge ${invite.share_jobs ? 'bg-success' : 'bg-secondary'}" title="Job sharing">
+                                        <i class="material-icons">${invite.share_jobs ? 'check' : 'close'}</i>
+                                        Jobs
+                                    </span>
+                                    <span class="badge ${invite.share_candidates ? 'bg-success' : 'bg-secondary'}" title="Candidate sharing">
+                                        <i class="material-icons">${invite.share_candidates ? 'check' : 'close'}</i>
+                                        Candidates
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="invitation-actions">
+                            <button class="btn btn-sm btn-secondary copy-link-btn" 
+                                    data-token="${invite.token}" 
+                                    onclick="copyInviteLink(this)">
+                                <i class="material-icons">content_copy</i>
+                                Copy Link
+                            </button>
+                            <button class="btn btn-sm btn-outline-error revoke-invite-btn" 
+                                    data-token="${invite.token}"
+                                    onclick="revokeInvitation(this)">
+                                <i class="material-icons">delete</i>
+                                Revoke
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+                listContainer.innerHTML = invitesHtml;
+            } else {
+                listContainer.innerHTML = `
+                    <div class="empty-invites">
+                        <i class="material-icons">mail</i>
+                        <p>No pending invitations</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            listContainer.innerHTML = `
+                <div class="error-message">
+                    <i class="material-icons">error</i>
+                    <p>Failed to load invitations: ${error.message}</p>
+                </div>
+            `;
+        });
+    }
+    
+    function copyInviteLink(button) {
+        const token = button.dataset.token;
+        const inviteLink = `${window.location.origin}/join/${token}`;
+        
+        navigator.clipboard.writeText(inviteLink).then(() => {
+            // Show copied indicator
+            const originalText = button.innerHTML;
+            button.innerHTML = `<i class="material-icons">check</i> Copied!`;
+            button.classList.add('btn-success');
+            
+            setTimeout(() => {
+                button.innerHTML = originalText;
+                button.classList.remove('btn-success');
+            }, 2000);
+        })
+        .catch(err => {
+            alert(`Failed to copy: ${err}`);
+        });
+    }
+    
+    function revokeInvitation(button) {
+        if (!confirm('Are you sure you want to revoke this invitation?')) return;
+        
+        const token = button.dataset.token;
+        
+        button.disabled = true;
+        button.innerHTML = `<i class="material-icons spin">refresh</i> Revoking...`;
+        
+        fetch(`/api/invites/${token}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': document.cookie.replace(/(?:(?:^|.*;\s*)access_token\s*\=\s*([^;]*).*$)|^.*$/, "$1")
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.message) {
+                // Reload the invitations list
+                loadInvitations();
+            } else {
+                alert(data.error || 'Failed to revoke invitation');
+                button.disabled = false;
+                button.innerHTML = `<i class="material-icons">delete</i> Revoke`;
+            }
+        })
+        .catch(error => {
+            alert(`Error: ${error.message}`);
+            button.disabled = false;
+            button.innerHTML = `<i class="material-icons">delete</i> Revoke`;
+        });
+    }
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize invitation form submission
+        const inviteForm = document.getElementById('inviteForm');
+        if (inviteForm) {
+            inviteForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const email = document.getElementById('inviteEmail').value;
+                const role = document.getElementById('inviteRole').value;
+                const shareJobs = document.getElementById('shareJobs').checked;
+                const shareCandidates = document.getElementById('shareCandidates').checked;
+                const messageContainer = document.getElementById('inviteMessage');
+                const submitBtn = this.querySelector('button[type="submit"]');
+                
+                // Disable submit button and show loading state
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="material-icons spin">refresh</i> Sending...';
+                
+                fetch('/api/invites', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': document.cookie.replace(/(?:(?:^|.*;\s*)access_token\s*\=\s*([^;]*).*$)|^.*$/, "$1")
+                    },
+                    body: JSON.stringify({ 
+                        email, 
+                        role,
+                        share_jobs: shareJobs,
+                        share_candidates: shareCandidates
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        // Show success message
+                        messageContainer.innerHTML = `
+                            <div class="info-box" style="background-color: #d1fae5;">
+                                <div class="info-icon" style="background-color: #065f46;">
+                                    <i class="material-icons">check_circle</i>
+                                </div>
+                                <p style="color: #065f46;">
+                                    <strong>Invitation sent!</strong><br>
+                                    An invitation link has been generated for ${email}.
+                                    <br>${data.invite_link ? 'Invitation link: ' + data.invite_link : ''}
+                                </p>
+                            </div>
+                        `;
+                        
+                        // Reset form
+                        inviteForm.reset();
+                        
+                        // Reload invitations list
+                        loadInvitations();
+                    } else {
+                        // Show error message
+                        messageContainer.innerHTML = `
+                            <div class="info-box" style="background-color: #fee2e2;">
+                                <div class="info-icon" style="background-color: #b91c1c;">
+                                    <i class="material-icons">error</i>
+                                </div>
+                                <p style="color: #b91c1c;">
+                                    <strong>Error:</strong> ${data.error || 'An unknown error occurred'}
+                                </p>
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    // Show error message
+                    messageContainer.innerHTML = `
+                        <div class="info-box" style="background-color: #fee2e2;">
+                            <div class="info-icon" style="background-color: #b91c1c;">
+                                <i class="material-icons">wifi_off</i>
+                            </div>
+                            <p style="color: #b91c1c;">
+                                <strong>Network error:</strong> ${error.message}
+                            </p>
+                        </div>
+                    `;
+                })
+                .finally(() => {
+                    // Reset submit button
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="material-icons">send</i> Send Invitation';
+                });
+            });
+        }
+        
+        // Load invitations if the section exists
+        if (document.getElementById('invitationsSection')) {
+            loadInvitations();
+        }
+    });
+</script>
+{% endblock %}
