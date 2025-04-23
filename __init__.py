@@ -17,3 +17,4 @@ def create_app():
     from . import routes
 
     return app
+print("DATABASE URI:", app.config.get("SQLALCHEMY_DATABASE_URI"))
